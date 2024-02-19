@@ -27,14 +27,60 @@ type MetabaseUser struct {
 	IsActive bool   `json:"is_active"`
 }
 
-func GetMetabaseRoles(hostname, sessionKey string) (map[string]MetabaseUser, error) {
+const METABASE_THRESHOLD_VERSION = "0.36"
+
+func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]MetabaseUser, error) {
 	baseUrl := "https://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
-	total := 1
-	for len(roles) < total {
-		url := baseUrl + "?offset=" + strconv.Itoa(len(roles))
-		req, err := http.NewRequest("GET", url, nil)
+	// In newer version of Metabase, the User API is paginated so the returned data is different, hence the difference of logic based on the version
+	if metabaseVersion > METABASE_THRESHOLD_VERSION {
+		total := 1
+		for len(roles) < total {
+			url := baseUrl + "?offset=" + strconv.Itoa(len(roles))
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				return nil, err
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Metabase-Session", sessionKey)
+
+			// Send Request
+			client := http.Client{Timeout: 30 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				return nil, err
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Error().Err(err).Msg("LOC getMetabaseRoles cannot read body")
+				return nil, err
+			}
+			defer resp.Body.Close()
+
+			var users []MetabaseUser
+			var response MetabaseUsersResponse
+			err = json.Unmarshal(body, &response)
+			if err != nil {
+				log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
+				err = json.Unmarshal(body, &users)
+				if err != nil {
+					log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
+					return nil, err
+				}
+			} else {
+				users = response.Data
+			}
+
+			for _, user := range users {
+				roles[user.Email] = user
+			}
+
+			total = response.Total
+		}
+	} else {
+		req, err := http.NewRequest("GET", baseUrl, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -56,8 +102,7 @@ func GetMetabaseRoles(hostname, sessionKey string) (map[string]MetabaseUser, err
 		defer resp.Body.Close()
 
 		var users []MetabaseUser
-		var response MetabaseUsersResponse
-		err = json.Unmarshal(body, &response)
+		err = json.Unmarshal(body, &users)
 		if err != nil {
 			log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
 			err = json.Unmarshal(body, &users)
@@ -65,17 +110,12 @@ func GetMetabaseRoles(hostname, sessionKey string) (map[string]MetabaseUser, err
 				log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
 				return nil, err
 			}
-		} else {
-			users = response.Data
 		}
 
 		for _, user := range users {
 			roles[user.Email] = user
 		}
-
-		total = response.Total
 	}
-
 	return roles, nil
 }
 
