@@ -10,6 +10,7 @@ type MetabaseIntegration struct {
 	MetabaseHostname string
 	MetabaseUsername string
 	MetabasePwd      string
+	Version          string
 }
 
 func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string) error {
@@ -20,7 +21,7 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 		return err
 	}
 
-	metabaseRoles, err := GetMetabaseRoles(metabaseIntegration.MetabaseHostname, sessionKey)
+	metabaseRoles, err := GetMetabaseRoles(metabaseIntegration.MetabaseHostname, metabaseIntegration.Version, sessionKey)
 	if err != nil {
 		return err
 	}
