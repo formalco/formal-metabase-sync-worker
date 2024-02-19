@@ -27,14 +27,14 @@ type MetabaseUser struct {
 	IsActive bool   `json:"is_active"`
 }
 
-const METABASE_THRESHOLD_VERSION = "0.36"
+const METABASE_THRESHOLD_VERSION = "0.40.0"
 
 func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]MetabaseUser, error) {
 	baseUrl := "https://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
 	// In newer version of Metabase, the User API is paginated so the returned data is different, hence the difference of logic based on the version
-	if metabaseVersion > METABASE_THRESHOLD_VERSION {
+	if metabaseVersion >= METABASE_THRESHOLD_VERSION {
 		total := 1
 		for len(roles) < total {
 			url := baseUrl + "?offset=" + strconv.Itoa(len(roles))
