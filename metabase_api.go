@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,49 +30,40 @@ func GetMetabaseRoles(hostname, sessionKey string) (map[string]MetabaseUser, err
 	baseUrl := "https://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
-	total := 1
-	for len(roles) < total {
-		url := baseUrl + "?offset=" + strconv.Itoa(len(roles))
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Metabase-Session", sessionKey)
+	req, err := http.NewRequest("GET", baseUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Metabase-Session", sessionKey)
 
-		// Send Request
-		client := http.Client{Timeout: 30 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
+	// Send Request
+	client := http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Error().Err(err).Msg("LOC getMetabaseRoles cannot read body")
-			return nil, err
-		}
-		defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Error().Err(err).Msg("LOC getMetabaseRoles cannot read body")
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-		var users []MetabaseUser
-		var response MetabaseUsersResponse
-		err = json.Unmarshal(body, &response)
+	var users []MetabaseUser
+	err = json.Unmarshal(body, &users)
+	if err != nil {
+		log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
+		err = json.Unmarshal(body, &users)
 		if err != nil {
 			log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
-			err = json.Unmarshal(body, &users)
-			if err != nil {
-				log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
-				return nil, err
-			}
-		} else {
-			users = response.Data
+			return nil, err
 		}
+	}
 
-		for _, user := range users {
-			roles[user.Email] = user
-		}
-
-		total = response.Total
+	for _, user := range users {
+		roles[user.Email] = user
 	}
 
 	return roles, nil
