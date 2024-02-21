@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
+	"net/http"
 
-	adminv1 "buf.build/gen/go/formal/admin/protocolbuffers/go/admin/v1"
-	connect_go "github.com/bufbuild/connect-go"
-	"github.com/formalco/go-sdk/sdk"
+	core_connect "buf.build/gen/go/formal/core/connectrpc/go/core/v1/corev1connect"
+	corev1 "buf.build/gen/go/formal/core/protocolbuffers/go/core/v1"
+	"connectrpc.com/connect"
 )
 
 type User struct {
@@ -20,25 +21,42 @@ type ExternalId struct {
 	AppId      string
 }
 
-type FormalSDK struct {
-	client *sdk.FormalSDK
+type transport struct {
+	underlyingTransport http.RoundTripper
+	apiKey              string
 }
 
-func New(apiKey string) *FormalSDK {
-	client := sdk.New(apiKey)
-	return &FormalSDK{
-		client: client,
+type Client struct {
+	client core_connect.UserServiceHandler
+}
+
+const (
+	FORMAL_HOST_URL string = "https://v2api.formalcloud.net"
+)
+
+func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Add("X-Api-Key", t.apiKey)
+	return t.underlyingTransport.RoundTrip(req)
+}
+
+func New(apiKey string) *Client {
+	httpClient := &http.Client{Transport: &transport{
+		underlyingTransport: http.DefaultTransport,
+		apiKey:              apiKey,
+	}}
+	return &Client{
+		client: core_connect.NewUserServiceClient(httpClient, FORMAL_HOST_URL),
 	}
 }
 
-func (sdk *FormalSDK) ListHumanFormalUsers() ([]User, error) {
-	var cussor string
+func (c *Client) ListHumanFormalUsers() ([]User, error) {
+	var cursor string
 
 	var users []User
 	for {
-		resp, err := sdk.client.UserServiceClient.ListUsers(context.Background(), connect_go.NewRequest(&adminv1.ListUsersRequest{
+		resp, err := c.client.ListUsers(context.Background(), connect.NewRequest(&corev1.ListUsersRequest{
 			Limit:  100,
-			Cursor: cussor,
+			Cursor: cursor,
 		},
 		))
 		if err != nil {
@@ -47,7 +65,14 @@ func (sdk *FormalSDK) ListHumanFormalUsers() ([]User, error) {
 		for _, user := range resp.Msg.Users {
 			if user.Type == "human" {
 				var externalIds []ExternalId
-				for _, externalId := range user.ExternalIds {
+				resp, err := c.client.ListUserExternalIds(context.Background(), connect.NewRequest(&corev1.ListUserExternalIdsRequest{
+					Id: user.Id,
+				},
+				))
+				if err != nil {
+					return nil, err
+				}
+				for _, externalId := range resp.Msg.ExternalIds {
 					externalIds = append(externalIds, ExternalId{
 						Id:         externalId.Id,
 						ExternalId: externalId.ExternalId,
@@ -56,7 +81,7 @@ func (sdk *FormalSDK) ListHumanFormalUsers() ([]User, error) {
 				}
 				users = append(users, User{
 					Id:          user.Id,
-					Email:       user.Email,
+					Email:       user.GetHuman().Email,
 					ExternalIds: externalIds,
 				})
 			}
@@ -64,14 +89,14 @@ func (sdk *FormalSDK) ListHumanFormalUsers() ([]User, error) {
 		if resp.Msg.ListMetadata.NextCursor == "" {
 			break
 		}
-		cussor = resp.Msg.ListMetadata.NextCursor
+		cursor = resp.Msg.ListMetadata.NextCursor
 	}
 
 	return users, nil
 }
 
-func (sdk *FormalSDK) MapUserToExternalId(userId, metabaseUserExternalId, integrationID string) error {
-	_, err := sdk.client.UserServiceClient.MapUserToExternalId(context.Background(), connect_go.NewRequest(&adminv1.MapUserToExternalIdRequest{
+func (c *Client) MapUserToExternalId(userId, metabaseUserExternalId, integrationID string) error {
+	_, err := c.client.CreateUserExternalId(context.Background(), connect.NewRequest(&corev1.CreateUserExternalIdRequest{
 		UserId:      userId,
 		ExternalId:  metabaseUserExternalId,
 		AppId:       integrationID,

@@ -30,7 +30,7 @@ type MetabaseUser struct {
 const METABASE_THRESHOLD_VERSION = "0.40.0"
 
 func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]MetabaseUser, error) {
-	baseUrl := "https://" + hostname + "/api/user"
+	baseUrl := "http://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
 	// In newer version of Metabase, the User API is paginated so the returned data is different, hence the difference of logic based on the version
@@ -120,7 +120,7 @@ func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]
 }
 
 func RefreshMetabaseSessionKey(integration MetabaseIntegration) (string, error) {
-	url := "https://" + integration.MetabaseHostname + "/api/session"
+	url := "http://" + integration.MetabaseHostname + "/api/session"
 
 	payload := map[string]string{
 		"username": integration.MetabaseUsername,
