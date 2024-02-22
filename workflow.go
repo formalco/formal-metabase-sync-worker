@@ -39,13 +39,13 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 			alreadyMapped := false
 			for _, existingExternalId := range user.ExternalIds {
 				if existingExternalId.ExternalId == metabaseUserExternalId && existingExternalId.AppId == integrationID {
-					log.Info().Msgf("Application %s has user %s already mapped to external ID %s", existingExternalId.AppId, user.Id, existingExternalId.ExternalId)
+					log.Debug().Msgf("Application %s has user %s already mapped to external ID %s", existingExternalId.AppId, user.Id, existingExternalId.ExternalId)
 					alreadyMapped = true
 					break
 				}
 			}
 			if alreadyMapped {
-				log.Info().Msgf("User %s is already mapped to external ID %s", user.Email, metabaseUserExternalId)
+				log.Debug().Msgf("User %s is already mapped to external ID %s", user.Email, metabaseUserExternalId)
 				continue
 			}
 
