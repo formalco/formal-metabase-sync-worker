@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
@@ -29,7 +30,7 @@ type MetabaseUser struct {
 
 const METABASE_THRESHOLD_VERSION = "0.40.0"
 
-func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]MetabaseUser, error) {
+func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string, verifyTLS bool) (map[string]MetabaseUser, error) {
 	baseUrl := "https://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
@@ -46,7 +47,12 @@ func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]
 			req.Header.Set("X-Metabase-Session", sessionKey)
 
 			// Send Request
-			client := http.Client{Timeout: 30 * time.Second}
+			client := &http.Client{
+				Timeout: 30 * time.Second,
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS},
+				},
+			}
 			resp, err := client.Do(req)
 			if err != nil {
 				return nil, err
@@ -88,7 +94,12 @@ func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]
 		req.Header.Set("X-Metabase-Session", sessionKey)
 
 		// Send Request
-		client := http.Client{Timeout: 30 * time.Second}
+		client := &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS},
+			},
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
@@ -119,7 +130,7 @@ func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string) (map[string]
 	return roles, nil
 }
 
-func RefreshMetabaseSessionKey(integration MetabaseIntegration) (string, error) {
+func RefreshMetabaseSessionKey(integration MetabaseIntegration, verifyTLS bool) (string, error) {
 	url := "https://" + integration.MetabaseHostname + "/api/session"
 
 	payload := map[string]string{
@@ -138,7 +149,12 @@ func RefreshMetabaseSessionKey(integration MetabaseIntegration) (string, error) 
 	req.Header.Set("Content-Type", "application/json")
 
 	// Send Request
-	client := http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS},
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err

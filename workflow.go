@@ -13,15 +13,15 @@ type MetabaseIntegration struct {
 	Version          string
 }
 
-func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string) error {
+func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string, verifyTLS bool) error {
 	client := New(apiKey)
 
-	sessionKey, err := RefreshMetabaseSessionKey(metabaseIntegration)
+	sessionKey, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS)
 	if err != nil {
 		return err
 	}
 
-	metabaseRoles, err := GetMetabaseRoles(metabaseIntegration.MetabaseHostname, metabaseIntegration.Version, sessionKey)
+	metabaseRoles, err := GetMetabaseRoles(metabaseIntegration.MetabaseHostname, metabaseIntegration.Version, sessionKey, verifyTLS)
 	if err != nil {
 		return err
 	}

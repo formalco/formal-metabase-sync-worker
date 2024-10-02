@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -16,6 +17,11 @@ func main() {
 	}
 	formalAPIKey := os.Getenv("FORMAL_API_KEY")
 	integrationID := os.Getenv("FORMAL_APP_ID")
+	verifyTLS, err := strconv.ParseBool(os.Getenv("VERIFY_TLS"))
+	if err != nil {
+		log.Error().Msg("Error parsing VERIFY_TLS environment variable. Defaulting to TRUE")
+		verifyTLS = true
+	}
 
 	logLevel := os.Getenv("LOG_LEVEL")
 	switch logLevel {
@@ -39,7 +45,7 @@ func main() {
 		logLevel = "info"
 	}
 
-	err := MetabaseWorkflow(metabaseIntegration, formalAPIKey, integrationID)
+	err = MetabaseWorkflow(metabaseIntegration, formalAPIKey, integrationID, verifyTLS)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error in MetabaseWorkflow")
 	}
