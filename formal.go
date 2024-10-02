@@ -66,7 +66,8 @@ func (c *Client) ListHumanFormalUsers() ([]User, error) {
 			if user.Type == "human" {
 				var externalIds []ExternalId
 				resp, err := c.client.ListUserExternalIds(context.Background(), connect.NewRequest(&corev1.ListUserExternalIdsRequest{
-					Id: user.Id,
+					Id:    user.Id,
+					Limit: 500,
 				},
 				))
 				if err != nil {
