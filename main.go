@@ -9,7 +9,14 @@ import (
 )
 
 func main() {
+	metabaseUseApiKey, err := strconv.ParseBool(os.Getenv("METABASE_USE_API_KEY"))
+	if err != nil {
+		metabaseUseApiKey = false
+	}
+
 	metabaseIntegration := MetabaseIntegration{
+		UseAPIKey:        metabaseUseApiKey,
+		MetabaseAPIKey:   os.Getenv("METABASE_API_KEY"),
 		MetabaseHostname: os.Getenv("METABASE_HOSTNAME"),
 		MetabaseUsername: os.Getenv("METABASE_USERNAME"),
 		MetabasePwd:      os.Getenv("METABASE_PASSWORD"),
