@@ -30,7 +30,7 @@ type MetabaseUser struct {
 
 const METABASE_THRESHOLD_VERSION = "0.40.0"
 
-func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string, verifyTLS bool) (map[string]MetabaseUser, error) {
+func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, sessionKey string, useAPIKey bool, verifyTLS bool) (map[string]MetabaseUser, error) {
 	baseUrl := "https://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
@@ -44,7 +44,11 @@ func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string, verifyTLS bo
 				return nil, err
 			}
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-Metabase-Session", sessionKey)
+			if useAPIKey {
+				req.Header.Set("X-API-Key", apiKey)
+			} else {
+				req.Header.Set("X-Metabase-Session", sessionKey)
+			}
 
 			// Send Request
 			client := &http.Client{
@@ -91,7 +95,11 @@ func GetMetabaseRoles(hostname, metabaseVersion, sessionKey string, verifyTLS bo
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Metabase-Session", sessionKey)
+		if useAPIKey {
+			req.Header.Set("X-API-Key", apiKey)
+		} else {
+			req.Header.Set("X-Metabase-Session", sessionKey)
+		}
 
 		// Send Request
 		client := &http.Client{

@@ -7,6 +7,8 @@ import (
 )
 
 type MetabaseIntegration struct {
+	UseAPIKey        bool
+	MetabaseAPIKey   string
 	MetabaseHostname string
 	MetabaseUsername string
 	MetabasePwd      string
@@ -16,12 +18,25 @@ type MetabaseIntegration struct {
 func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string, verifyTLS bool) error {
 	client := New(apiKey)
 
-	sessionKey, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS)
-	if err != nil {
-		return err
+	sessionKey := ""
+
+	if !metabaseIntegration.UseAPIKey {
+		key, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS)
+		if err != nil {
+			return err
+		}
+
+		sessionKey = key
 	}
 
-	metabaseRoles, err := GetMetabaseRoles(metabaseIntegration.MetabaseHostname, metabaseIntegration.Version, sessionKey, verifyTLS)
+	metabaseRoles, err := GetMetabaseRoles(
+		metabaseIntegration.MetabaseHostname,
+		metabaseIntegration.Version,
+		metabaseIntegration.MetabaseAPIKey,
+		sessionKey,
+		metabaseIntegration.UseAPIKey,
+		verifyTLS,
+	)
 	if err != nil {
 		return err
 	}
