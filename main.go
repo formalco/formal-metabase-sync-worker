@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -52,8 +53,23 @@ func main() {
 		logLevel = "info"
 	}
 
-	err = MetabaseWorkflow(metabaseIntegration, formalAPIKey, integrationID, verifyTLS)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Error in MetabaseWorkflow")
+	frequency := os.Getenv("FREQUENCY")
+	var duration time.Duration
+	if frequency != "" {
+		duration, err = time.ParseDuration(frequency)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Invalid FREQUENCY format. Expected format: '1h', '30m', etc.")
+		}
+	}
+
+	for {
+		err = MetabaseWorkflow(metabaseIntegration, formalAPIKey, integrationID, verifyTLS)
+		if err != nil {
+			log.Error().Err(err).Msg("Error in MetabaseWorkflow")
+		}
+		if frequency == "" {
+			break
+		}
+		time.Sleep(duration)
 	}
 }
