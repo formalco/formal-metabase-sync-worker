@@ -27,3 +27,4 @@ docker run -e METABASE_HOSTNAME="" -e METABASE_USE_API_KEY="" -e METABASE_API_KE
 - ```FORMAL_APP_ID```: The app id of the Formal Metabase integration
 - ```VERIFY_TLS```: Whether or not to verify the TLS certificate of the Metabase instance. Set to `true` or `false`
 - ```LOG_LEVEL``` (optional): Set the Global logging level to any of these options: `debug`, `info`, `warn`, `error`, `fatal`, `panic`, `disabled`. Default value is `info`.
+- ```FREQUENCY``` (optional): The frequency at which to run the sync. Expected format: `1h`, `30m`, etc. If not provided, the sync will run once and then exit.
