@@ -1,11 +1,12 @@
 name: Build and Push to ECR
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     tags:
       - 'v*.*.*'
-
+      
 permissions:
   contents: read
   id-token: write    
@@ -18,6 +19,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Setup Depot
+      uses: depot/setup-action@v1
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -29,13 +33,10 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Build, tag, and push image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: formalco-prod-metabase-sync-worker
-        IMAGE_TAG: ${{ github.ref_name }}
-      run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      uses: depot/build-push-action@v1
+      with:
+        project: ${{ vars.DEPOT_PROJECT_ID }}
+        context: .
+        tags: ${{ steps.login-ecr.outputs.registry }}/formalco-prod-metabase-sync-worker:${{ github.ref_name }}, ${{ steps.login-ecr.outputs.registry }}/formalco-prod-metabase-sync-worker:latest
+        platforms: linux/amd64, linux/arm64
+        push: true
