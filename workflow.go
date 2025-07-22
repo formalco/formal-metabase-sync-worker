@@ -15,13 +15,13 @@ type MetabaseIntegration struct {
 	Version          string
 }
 
-func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string, verifyTLS bool) error {
+func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string, verifyTLS bool, cfAccessClientID, cfAccessClientSecret string) error {
 	client := New(apiKey)
 
 	sessionKey := ""
 
 	if !metabaseIntegration.UseAPIKey {
-		key, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS)
+		key, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS, cfAccessClientID, cfAccessClientSecret)
 		if err != nil {
 			return err
 		}
@@ -36,6 +36,8 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 		sessionKey,
 		metabaseIntegration.UseAPIKey,
 		verifyTLS,
+		cfAccessClientID,
+		cfAccessClientSecret,
 	)
 	if err != nil {
 		return err
