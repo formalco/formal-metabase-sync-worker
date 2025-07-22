@@ -30,7 +30,7 @@ type MetabaseUser struct {
 
 const METABASE_THRESHOLD_VERSION = "0.40.0"
 
-func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, sessionKey string, useAPIKey bool, verifyTLS bool) (map[string]MetabaseUser, error) {
+func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, sessionKey string, useAPIKey bool, verifyTLS bool, cfAccessClientID, cfAccessClientSecret string) (map[string]MetabaseUser, error) {
 	baseUrl := "https://" + hostname + "/api/user"
 
 	roles := map[string]MetabaseUser{}
@@ -48,6 +48,13 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 				req.Header.Set("X-API-Key", apiKey)
 			} else {
 				req.Header.Set("X-Metabase-Session", sessionKey)
+			}
+			// Add Cloudflare Access headers if provided
+			if cfAccessClientID != "" {
+				req.Header.Set("CF-Access-Client-Id", cfAccessClientID)
+			}
+			if cfAccessClientSecret != "" {
+				req.Header.Set("CF-Access-Client-Secret", cfAccessClientSecret)
 			}
 
 			// Send Request
@@ -100,6 +107,13 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 		} else {
 			req.Header.Set("X-Metabase-Session", sessionKey)
 		}
+		// Add Cloudflare Access headers if provided
+		if cfAccessClientID != "" {
+			req.Header.Set("CF-Access-Client-Id", cfAccessClientID)
+		}
+		if cfAccessClientSecret != "" {
+			req.Header.Set("CF-Access-Client-Secret", cfAccessClientSecret)
+		}
 
 		// Send Request
 		client := &http.Client{
@@ -138,7 +152,7 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 	return roles, nil
 }
 
-func RefreshMetabaseSessionKey(integration MetabaseIntegration, verifyTLS bool) (string, error) {
+func RefreshMetabaseSessionKey(integration MetabaseIntegration, verifyTLS bool, cfAccessClientID, cfAccessClientSecret string) (string, error) {
 	url := "https://" + integration.MetabaseHostname + "/api/session"
 
 	payload := map[string]string{
@@ -155,6 +169,13 @@ func RefreshMetabaseSessionKey(integration MetabaseIntegration, verifyTLS bool) 
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	// Add Cloudflare Access headers if provided
+	if cfAccessClientID != "" {
+		req.Header.Set("CF-Access-Client-Id", cfAccessClientID)
+	}
+	if cfAccessClientSecret != "" {
+		req.Header.Set("CF-Access-Client-Secret", cfAccessClientSecret)
+	}
 
 	// Send Request
 	client := &http.Client{
