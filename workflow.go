@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/rs/zerolog/log"
@@ -23,7 +24,7 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 	if !metabaseIntegration.UseAPIKey {
 		key, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS, cfAccessClientID, cfAccessClientSecret)
 		if err != nil {
-			return err
+			return fmt.Errorf("error refreshing Metabase session key: %w", err)
 		}
 
 		sessionKey = key
@@ -40,12 +41,12 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 		cfAccessClientSecret,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting Metabase roles: %w", err)
 	}
 
 	users, err := client.ListHumanFormalUsers()
 	if err != nil {
-		return err
+		return fmt.Errorf("error listing Formal users: %w", err)
 	}
 
 	mappedUserCount := 0
@@ -68,8 +69,7 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 
 			err = client.MapUserToExternalId(user.Id, metabaseUserExternalId, integrationID)
 			if err != nil {
-				log.Error().Err(err)
-				return err
+				return fmt.Errorf("error mapping user %s to external ID %s: %w", user.Email, metabaseUserExternalId, err)
 			}
 			mappedUserCount++
 		}
