@@ -138,6 +138,7 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 		var users []MetabaseUser
 		err = json.Unmarshal(body, &users)
 		if err != nil {
+			log.Debug().Msgf("Received body: %s", body)
 			log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
 			err = json.Unmarshal(body, &users)
 			if err != nil {
