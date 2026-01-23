@@ -27,7 +27,7 @@ func main() {
 	integrationID := os.Getenv("FORMAL_APP_ID")
 	verifyTLS, err := strconv.ParseBool(os.Getenv("VERIFY_TLS"))
 	if err != nil {
-		log.Error().Msg("Error parsing VERIFY_TLS environment variable. Defaulting to TRUE")
+		log.Warn().Msg("Invalid VERIFY_TLS value, defaulting to true")
 		verifyTLS = true
 	}
 
@@ -49,7 +49,6 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.Disabled)
 	default:
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		log.Info().Msg("No log level set, defaulting to info")
 		logLevel = "info"
 	}
 
@@ -67,13 +66,15 @@ func main() {
 	cfAccessClientSecret := os.Getenv("CF_ACCESS_CLIENT_SECRET")
 
 	for {
+		log.Info().Msg("Starting Metabase sync")
 		err = MetabaseWorkflow(metabaseIntegration, formalAPIKey, integrationID, verifyTLS, cfAccessClientID, cfAccessClientSecret)
 		if err != nil {
-			log.Error().Err(err).Msg("Error in MetabaseWorkflow")
+			log.Error().Err(err).Msg("Sync failed")
 		}
 		if frequency == "" {
 			break
 		}
+		log.Info().Msgf("Waiting %s before next sync", duration.String())
 		time.Sleep(duration)
 	}
 }

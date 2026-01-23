@@ -22,14 +22,16 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 	sessionKey := ""
 
 	if !metabaseIntegration.UseAPIKey {
+		log.Info().Str("hostname", metabaseIntegration.MetabaseHostname).Msg("Authenticating to Metabase")
 		key, err := RefreshMetabaseSessionKey(metabaseIntegration, verifyTLS, cfAccessClientID, cfAccessClientSecret)
 		if err != nil {
-			return fmt.Errorf("error refreshing Metabase session key: %w", err)
+			return fmt.Errorf("failed to authenticate to Metabase: %w", err)
 		}
 
 		sessionKey = key
 	}
 
+	log.Info().Str("hostname", metabaseIntegration.MetabaseHostname).Msg("Fetching users from Metabase")
 	metabaseRoles, err := GetMetabaseRoles(
 		metabaseIntegration.MetabaseHostname,
 		metabaseIntegration.Version,
@@ -41,15 +43,20 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 		cfAccessClientSecret,
 	)
 	if err != nil {
-		return fmt.Errorf("error getting Metabase roles: %w", err)
+		return fmt.Errorf("failed to fetch Metabase users: %w", err)
 	}
+	log.Info().Int("count", len(metabaseRoles)).Msg("Fetched users from Metabase")
 
+	log.Info().Msg("Fetching users from Formal")
 	users, err := client.ListHumanFormalUsers()
 	if err != nil {
-		return fmt.Errorf("error listing Formal users: %w", err)
+		return fmt.Errorf("failed to fetch Formal users: %w", err)
 	}
+	log.Info().Int("count", len(users)).Msg("Fetched users from Formal")
 
+	log.Info().Msg("Mapping Metabase users to Formal users")
 	mappedUserCount := 0
+	skippedUserCount := 0
 	for _, user := range users {
 		metabaseUser, exists := metabaseRoles[user.Email]
 		if exists {
@@ -57,23 +64,24 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 			alreadyMapped := false
 			for _, existingExternalId := range user.ExternalIds {
 				if existingExternalId.ExternalId == metabaseUserExternalId && existingExternalId.AppId == integrationID {
-					log.Debug().Msgf("Application %s has user %s already mapped to external ID %s", existingExternalId.AppId, user.Id, existingExternalId.ExternalId)
 					alreadyMapped = true
 					break
 				}
 			}
 			if alreadyMapped {
-				log.Debug().Msgf("User %s is already mapped to external ID %s", user.Email, metabaseUserExternalId)
+				log.Debug().Str("email", user.Email).Str("external_id", metabaseUserExternalId).Msg("User already mapped, skipping")
+				skippedUserCount++
 				continue
 			}
 
 			err = client.MapUserToExternalId(user.Id, metabaseUserExternalId, integrationID)
 			if err != nil {
-				return fmt.Errorf("error mapping user %s to external ID %s: %w", user.Email, metabaseUserExternalId, err)
+				return fmt.Errorf("failed to map user %s: %w", user.Email, err)
 			}
+			log.Debug().Str("email", user.Email).Str("external_id", metabaseUserExternalId).Msg("Mapped user")
 			mappedUserCount++
 		}
 	}
-	log.Info().Msgf("Metabase sync has finished. %d new user(s) mapped.", mappedUserCount)
+	log.Info().Int("mapped", mappedUserCount).Int("skipped", skippedUserCount).Msg("Sync completed")
 	return nil
 }

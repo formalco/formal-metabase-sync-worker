@@ -71,20 +71,23 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				log.Error().Err(err).Msg("LOC getMetabaseRoles cannot read body")
 				return nil, err
 			}
 			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				log.Debug().Str("body", string(body)).Int("status", resp.StatusCode).Msg("Unexpected response from Metabase API")
+				return nil, errors.New("Metabase API returned status " + strconv.Itoa(resp.StatusCode))
+			}
 
 			var users []MetabaseUser
 			var response MetabaseUsersResponse
 			err = json.Unmarshal(body, &response)
 			if err != nil {
-				log.Debug().Msgf("Received body: %s", body)
-				log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
+				log.Debug().Str("body", string(body)).Msg("Trying legacy response format")
 				err = json.Unmarshal(body, &users)
 				if err != nil {
-					log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
+					log.Debug().Str("body", string(body)).Msg("Failed to parse Metabase API response")
 					return nil, err
 				}
 			} else {
@@ -130,21 +133,20 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Error().Err(err).Msg("LOC getMetabaseRoles cannot read body")
 			return nil, err
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode != http.StatusOK {
+			log.Debug().Str("body", string(body)).Int("status", resp.StatusCode).Msg("Unexpected response from Metabase API")
+			return nil, errors.New("Metabase API returned status " + strconv.Itoa(resp.StatusCode))
+		}
+
 		var users []MetabaseUser
 		err = json.Unmarshal(body, &users)
 		if err != nil {
-			log.Debug().Msgf("Received body: %s", body)
-			log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
-			err = json.Unmarshal(body, &users)
-			if err != nil {
-				log.Error().Err(err).Msg("Error in getMetabaseRoles - cannot unmarshal body")
-				return nil, err
-			}
+			log.Debug().Str("body", string(body)).Msg("Failed to parse Metabase API response")
+			return nil, err
 		}
 
 		for _, user := range users {
@@ -194,15 +196,15 @@ func RefreshMetabaseSessionKey(integration MetabaseIntegration, verifyTLS bool, 
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		log.Error().Msg("LOC refreshMetabaseSessionKey.StatusCode: " + string(body))
-		return "", errors.New(string(body))
+		log.Debug().Str("body", string(body)).Int("status", resp.StatusCode).Msg("Authentication failed")
+		return "", errors.New("authentication failed: " + string(body))
 	}
 
 	var response MetabaseSessionResponse
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&response)
 	if err != nil {
-		log.Error().Err(err).Msg("LOC MetabaseSessionResponse")
+		log.Debug().Err(err).Msg("Failed to parse session response")
 		return "", err
 	}
 
