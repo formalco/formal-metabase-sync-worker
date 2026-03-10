@@ -31,7 +31,7 @@ type Client struct {
 }
 
 const (
-	FORMAL_HOST_URL string = "https://v2api.formalcloud.net"
+	FORMAL_HOST_URL string = "https://api.joinformal.com"
 )
 
 func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -96,12 +96,12 @@ func (c *Client) ListHumanFormalUsers() ([]User, error) {
 	return users, nil
 }
 
-func (c *Client) MapUserToExternalId(userId, metabaseUserExternalId, integrationID string) error {
+func (c *Client) CreateUserExternalId(userId, externalId, integrationID, description string) error {
 	_, err := c.client.CreateUserExternalId(context.Background(), connect.NewRequest(&corev1.CreateUserExternalIdRequest{
 		UserId:      userId,
-		ExternalId:  metabaseUserExternalId,
+		ExternalId:  externalId,
 		AppId:       integrationID,
-		Description: "This External ID was imported for this role via Metabase.",
+		Description: description,
 	}))
 	if err != nil {
 		return err

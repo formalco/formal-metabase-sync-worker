@@ -16,9 +16,13 @@ type MetabaseIntegration struct {
 	Version          string
 }
 
-func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrationID string, verifyTLS bool, cfAccessClientID, cfAccessClientSecret string) error {
-	client := New(apiKey)
+type OmniIntegration struct {
+	APIKey        string
+	Hostname      string
+	IntegrationID string
+}
 
+func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, formalClient *Client, users []User, integrationID string, verifyTLS bool, cfAccessClientID, cfAccessClientSecret string) error {
 	sessionKey := ""
 
 	if !metabaseIntegration.UseAPIKey {
@@ -47,13 +51,6 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 	}
 	log.Info().Int("count", len(metabaseRoles)).Msg("Fetched users from Metabase")
 
-	log.Info().Msg("Fetching users from Formal")
-	users, err := client.ListHumanFormalUsers()
-	if err != nil {
-		return fmt.Errorf("failed to fetch Formal users: %w", err)
-	}
-	log.Info().Int("count", len(users)).Msg("Fetched users from Formal")
-
 	log.Info().Msg("Mapping Metabase users to Formal users")
 	mappedUserCount := 0
 	skippedUserCount := 0
@@ -74,7 +71,7 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 				continue
 			}
 
-			err = client.MapUserToExternalId(user.Id, metabaseUserExternalId, integrationID)
+			err = formalClient.CreateUserExternalId(user.Id, metabaseUserExternalId, integrationID, "This External ID was imported for this user via Metabase.")
 			if err != nil {
 				return fmt.Errorf("failed to map user %s: %w", user.Email, err)
 			}
@@ -82,6 +79,46 @@ func MetabaseWorkflow(metabaseIntegration MetabaseIntegration, apiKey, integrati
 			mappedUserCount++
 		}
 	}
-	log.Info().Int("mapped", mappedUserCount).Int("skipped", skippedUserCount).Msg("Sync completed")
+	log.Info().Int("mapped", mappedUserCount).Int("skipped", skippedUserCount).Msg("Metabase sync completed")
+	return nil
+}
+
+func OmniWorkflow(omniIntegration OmniIntegration, formalClient *Client, users []User) error {
+	log.Info().Str("hostname", omniIntegration.Hostname).Msg("Fetching users from Omni")
+	omniUsers, err := GetOmniUsers(omniIntegration.Hostname, omniIntegration.APIKey)
+	if err != nil {
+		return fmt.Errorf("failed to fetch Omni users: %w", err)
+	}
+	log.Info().Int("count", len(omniUsers)).Msg("Fetched users from Omni")
+
+	log.Info().Msg("Mapping Omni users to Formal users")
+	mappedUserCount := 0
+	skippedUserCount := 0
+	for _, user := range users {
+		omniUser, exists := omniUsers[user.Email]
+		if exists {
+			omniUserExternalId := omniUser.Id
+			alreadyMapped := false
+			for _, existingExternalId := range user.ExternalIds {
+				if existingExternalId.ExternalId == omniUserExternalId && existingExternalId.AppId == omniIntegration.IntegrationID {
+					alreadyMapped = true
+					break
+				}
+			}
+			if alreadyMapped {
+				log.Debug().Str("email", user.Email).Str("external_id", omniUserExternalId).Msg("User already mapped, skipping")
+				skippedUserCount++
+				continue
+			}
+
+			err = formalClient.CreateUserExternalId(user.Id, omniUserExternalId, omniIntegration.IntegrationID, "This External ID was imported for this user via Omni.")
+			if err != nil {
+				return fmt.Errorf("failed to map user %s: %w", user.Email, err)
+			}
+			log.Debug().Str("email", user.Email).Str("external_id", omniUserExternalId).Msg("Mapped user")
+			mappedUserCount++
+		}
+	}
+	log.Info().Int("mapped", mappedUserCount).Int("skipped", skippedUserCount).Msg("Omni sync completed")
 	return nil
 }

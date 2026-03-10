@@ -10,21 +10,7 @@ import (
 )
 
 func main() {
-	metabaseUseApiKey, err := strconv.ParseBool(os.Getenv("METABASE_USE_API_KEY"))
-	if err != nil {
-		metabaseUseApiKey = false
-	}
-
-	metabaseIntegration := MetabaseIntegration{
-		UseAPIKey:        metabaseUseApiKey,
-		MetabaseAPIKey:   os.Getenv("METABASE_API_KEY"),
-		MetabaseHostname: os.Getenv("METABASE_HOSTNAME"),
-		MetabaseUsername: os.Getenv("METABASE_USERNAME"),
-		MetabasePwd:      os.Getenv("METABASE_PASSWORD"),
-		Version:          os.Getenv("METABASE_VERSION"),
-	}
 	formalAPIKey := os.Getenv("FORMAL_API_KEY")
-	integrationID := os.Getenv("FORMAL_APP_ID")
 	verifyTLS, err := strconv.ParseBool(os.Getenv("VERIFY_TLS"))
 	if err != nil {
 		log.Warn().Msg("Invalid VERIFY_TLS value, defaulting to true")
@@ -61,16 +47,75 @@ func main() {
 		}
 	}
 
-	// Cloudflare Access headers
 	cfAccessClientID := os.Getenv("CF_ACCESS_CLIENT_ID")
 	cfAccessClientSecret := os.Getenv("CF_ACCESS_CLIENT_SECRET")
 
-	for {
-		log.Info().Msg("Starting Metabase sync")
-		err = MetabaseWorkflow(metabaseIntegration, formalAPIKey, integrationID, verifyTLS, cfAccessClientID, cfAccessClientSecret)
+	var metabaseEnabled bool
+	var metabaseIntegration MetabaseIntegration
+	metabaseHostname := os.Getenv("METABASE_HOSTNAME")
+	if metabaseHostname != "" {
+		metabaseUseApiKey, err := strconv.ParseBool(os.Getenv("METABASE_USE_API_KEY"))
 		if err != nil {
-			log.Error().Err(err).Msg("Sync failed")
+			metabaseUseApiKey = false
 		}
+		metabaseIntegration = MetabaseIntegration{
+			UseAPIKey:        metabaseUseApiKey,
+			MetabaseAPIKey:   os.Getenv("METABASE_API_KEY"),
+			MetabaseHostname: metabaseHostname,
+			MetabaseUsername: os.Getenv("METABASE_USERNAME"),
+			MetabasePwd:      os.Getenv("METABASE_PASSWORD"),
+			Version:          os.Getenv("METABASE_VERSION"),
+		}
+		metabaseEnabled = true
+		log.Info().Str("hostname", metabaseHostname).Msg("Metabase sync enabled")
+	}
+
+	var omniEnabled bool
+	var omniIntegration OmniIntegration
+	omniAPIKey := os.Getenv("OMNI_API_KEY")
+	omniHostname := os.Getenv("OMNI_HOSTNAME")
+	if omniAPIKey != "" && omniHostname != "" {
+		omniIntegration = OmniIntegration{
+			APIKey:        omniAPIKey,
+			Hostname:      omniHostname,
+			IntegrationID: os.Getenv("OMNI_BI_INTEGRATION_ID"),
+		}
+		omniEnabled = true
+		log.Info().Str("hostname", omniHostname).Msg("Omni sync enabled")
+	}
+
+	if !metabaseEnabled && !omniEnabled {
+		log.Fatal().Msg("No integrations configured. Set METABASE_HOSTNAME for Metabase or OMNI_API_KEY and OMNI_HOSTNAME for Omni.")
+	}
+
+	formalClient := New(formalAPIKey)
+
+	for {
+		log.Info().Msg("Fetching users from Formal")
+		users, err := formalClient.ListHumanFormalUsers()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch Formal users")
+		} else {
+			log.Info().Int("count", len(users)).Msg("Fetched users from Formal")
+
+			if metabaseEnabled {
+				log.Info().Msg("Starting Metabase sync")
+				metabaseIntegrationID := os.Getenv("METABASE_BI_INTEGRATION_ID")
+				err = MetabaseWorkflow(metabaseIntegration, formalClient, users, metabaseIntegrationID, verifyTLS, cfAccessClientID, cfAccessClientSecret)
+				if err != nil {
+					log.Error().Err(err).Msg("Metabase sync failed")
+				}
+			}
+
+			if omniEnabled {
+				log.Info().Msg("Starting Omni sync")
+				err = OmniWorkflow(omniIntegration, formalClient, users)
+				if err != nil {
+					log.Error().Err(err).Msg("Omni sync failed")
+				}
+			}
+		}
+
 		if frequency == "" {
 			break
 		}
