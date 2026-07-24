@@ -26,7 +26,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
         aws-region: ${{ vars.AWS_CUSTOMERS_ECR_REPOS_REGION }}
-        role-to-assume: arn:aws:iam::${{ vars.AWS_CUSTOMERS_ECR_REPOS_ACCOUNT_ID }}:role/${{ vars.AWS_CUSTOMERS_ECR_REPOS_OIDC_ROLE_NAME }}
+        role-to-assume: arn:aws:iam::${{ vars.AWS_CUSTOMERS_ECR_REPOS_ACCOUNT_ID }}:role/github-actions-ecr-publish
 
     - name: Login to Amazon ECR
       id: login-ecr
