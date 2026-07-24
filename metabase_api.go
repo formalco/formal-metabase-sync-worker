@@ -37,8 +37,9 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 	// In newer version of Metabase, the User API is paginated so the returned data is different, hence the difference of logic based on the version
 	if metabaseVersion >= METABASE_THRESHOLD_VERSION {
 		total := 1
-		for len(roles) < total {
-			url := baseUrl + "?offset=" + strconv.Itoa(len(roles))
+		offset := 0
+		for offset < total {
+			url := baseUrl + "?offset=" + strconv.Itoa(offset)
 			req, err := http.NewRequest("GET", url, nil)
 			if err != nil {
 				return nil, err
@@ -70,10 +71,10 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 			}
 
 			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
 				log.Debug().Str("body", string(body)).Int("status", resp.StatusCode).Msg("Unexpected response from Metabase API")
@@ -98,6 +99,10 @@ func GetMetabaseRoles(hostname string, metabaseVersion string, apiKey string, se
 				roles[user.Email] = user
 			}
 
+			if len(users) == 0 {
+				break
+			}
+			offset += len(users)
 			total = response.Total
 		}
 	} else {

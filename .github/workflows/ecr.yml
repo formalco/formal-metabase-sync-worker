@@ -17,23 +17,23 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
 
     - name: Setup Depot
-      uses: depot/setup-action@v1
+      uses: depot/setup-action@15c09a5f77a0840ad4bce955686522a257853461 # v1.7.1
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
         aws-region: ${{ vars.AWS_CUSTOMERS_ECR_REPOS_REGION }}
         role-to-assume: arn:aws:iam::${{ vars.AWS_CUSTOMERS_ECR_REPOS_ACCOUNT_ID }}:role/${{ vars.AWS_CUSTOMERS_ECR_REPOS_OIDC_ROLE_NAME }}
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7 # v1.7.1
 
     - name: Build, tag, and push image to Amazon ECR
-      uses: depot/build-push-action@v1
+      uses: depot/build-push-action@98e78adca7817480b8185f474a400b451d74e287 # v1.18.0
       with:
         project: ${{ vars.DEPOT_PROJECT_ID }}
         context: .

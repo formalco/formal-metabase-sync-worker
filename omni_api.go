@@ -68,7 +68,7 @@ func GetOmniUsers(hostname, apiKey string) (map[string]OmniUser, error) {
 			users[user.UserName] = user
 		}
 
-		if startIndex+len(response.Resources) > response.TotalResults {
+		if len(response.Resources) == 0 || startIndex+len(response.Resources) > response.TotalResults {
 			break
 		}
 		startIndex += len(response.Resources)

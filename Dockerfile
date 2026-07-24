@@ -1,8 +1,10 @@
-FROM golang AS builder
+FROM --platform=$BUILDPLATFORM golang AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 WORKDIR /app
 
-COPY .. .
+COPY . .
 
 RUN go mod tidy && \
   go mod download && \
