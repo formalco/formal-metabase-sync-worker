@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 
-	core_connect "buf.build/gen/go/formal/core/connectrpc/go/core/v1/corev1connect"
-	corev1 "buf.build/gen/go/formal/core/protocolbuffers/go/core/v1"
-	"connectrpc.com/connect"
+	"github.com/samber/lo"
+
+	formal "github.com/formalco/go-sdk/v3"
+	corev1 "github.com/formalco/go-sdk/v3/core/v1"
 )
 
 type User struct {
@@ -21,91 +22,92 @@ type ExternalId struct {
 	AppId      string
 }
 
-type transport struct {
-	underlyingTransport http.RoundTripper
-	apiKey              string
-}
-
 type Client struct {
-	client core_connect.UserServiceHandler
+	sdk *formal.Client
 }
 
-const (
-	FORMAL_HOST_URL string = "https://api.joinformal.com"
-)
-
-func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Add("X-Api-Key", t.apiKey)
-	return t.underlyingTransport.RoundTrip(req)
-}
-
-func New(apiKey string) *Client {
-	httpClient := &http.Client{Transport: &transport{
-		underlyingTransport: http.DefaultTransport,
-		apiKey:              apiKey,
-	}}
-	return &Client{
-		client: core_connect.NewUserServiceClient(httpClient, FORMAL_HOST_URL),
+func New(apiKey string, opts ...formal.Option) (*Client, error) {
+	all := make([]formal.Option, 0, len(opts)+1)
+	all = append(all, formal.WithAPIKey(apiKey))
+	all = append(all, opts...)
+	sdk, err := formal.New(all...)
+	if err != nil {
+		return nil, fmt.Errorf("create Formal SDK client: %w", err)
 	}
+	return &Client{sdk: sdk}, nil
 }
 
-func (c *Client) ListHumanFormalUsers() ([]User, error) {
+func (c *Client) ListHumanFormalUsers(ctx context.Context) ([]User, error) {
 	var cursor string
-
 	var users []User
 	for {
-		resp, err := c.client.ListUsers(context.Background(), connect.NewRequest(&corev1.ListUsersRequest{
+		resp, err := c.sdk.UserServiceClient.ListUsers(ctx, &corev1.ListUsersRequest{
 			Limit:  100,
 			Cursor: cursor,
-		},
-		))
+		})
 		if err != nil {
 			return nil, err
 		}
-		for _, user := range resp.Msg.Users {
-			if user.Type == "human" {
-				var externalIds []ExternalId
-				resp, err := c.client.ListUserExternalIds(context.Background(), connect.NewRequest(&corev1.ListUserExternalIdsRequest{
-					Id:    user.Id,
-					Limit: 500,
-				},
-				))
-				if err != nil {
-					return nil, err
-				}
-				for _, externalId := range resp.Msg.ExternalIds {
-					externalIds = append(externalIds, ExternalId{
-						Id:         externalId.Id,
-						ExternalId: externalId.ExternalId,
-						AppId:      externalId.AppId,
-					})
-				}
-				users = append(users, User{
-					Id:          user.Id,
-					Email:       user.GetHuman().Email,
-					ExternalIds: externalIds,
-				})
+		humans := lo.Filter(resp.Users, func(user *corev1.User, _ int) bool {
+			return user.Type == "human" && user.GetHuman() != nil
+		})
+		pageUsers, err := lo.MapErr(humans, func(user *corev1.User, _ int) (User, error) {
+			externalIds, err := c.listUserExternalIds(ctx, user.Id)
+			if err != nil {
+				return User{}, err
 			}
+			return User{
+				Id:          user.Id,
+				Email:       user.GetHuman().Email,
+				ExternalIds: externalIds,
+			}, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		if resp.Msg.ListMetadata.NextCursor == "" {
+		users = append(users, pageUsers...)
+		if resp.ListMetadata == nil || resp.ListMetadata.NextCursor == "" {
 			break
 		}
-		cursor = resp.Msg.ListMetadata.NextCursor
+		cursor = resp.ListMetadata.NextCursor
 	}
 
 	return users, nil
 }
 
-func (c *Client) CreateUserExternalId(userId, externalId, integrationID, description string) error {
-	_, err := c.client.CreateUserExternalId(context.Background(), connect.NewRequest(&corev1.CreateUserExternalIdRequest{
+func (c *Client) listUserExternalIds(ctx context.Context, userID string) ([]ExternalId, error) {
+	var cursor string
+	var externalIds []ExternalId
+	for {
+		resp, err := c.sdk.UserServiceClient.ListUserExternalIds(ctx, &corev1.ListUserExternalIdsRequest{
+			Id:     userID,
+			Limit:  500,
+			Cursor: cursor,
+		})
+		if err != nil {
+			return nil, err
+		}
+		externalIds = append(externalIds, lo.Map(resp.ExternalIds, func(externalId *corev1.ExternalId, _ int) ExternalId {
+			return ExternalId{
+				Id:         externalId.Id,
+				ExternalId: externalId.ExternalId,
+				AppId:      externalId.AppId,
+			}
+		})...)
+		if resp.ListMetadata == nil || resp.ListMetadata.NextCursor == "" {
+			break
+		}
+		cursor = resp.ListMetadata.NextCursor
+	}
+	return externalIds, nil
+}
+
+func (c *Client) CreateUserExternalId(ctx context.Context, userId, externalId, integrationID, description string) error {
+	_, err := c.sdk.UserServiceClient.CreateUserExternalId(ctx, &corev1.CreateUserExternalIdRequest{
 		UserId:      userId,
 		ExternalId:  externalId,
 		AppId:       integrationID,
 		Description: description,
-	}))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	})
+	return err
 }

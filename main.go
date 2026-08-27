@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -88,12 +91,27 @@ func main() {
 		log.Fatal().Msg("No integrations configured. Set METABASE_HOSTNAME for Metabase or OMNI_API_KEY and OMNI_HOSTNAME for Omni.")
 	}
 
-	formalClient := New(formalAPIKey)
+	formalClient, err := New(formalAPIKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create Formal SDK client")
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	for {
+		if err := ctx.Err(); err != nil {
+			log.Info().Err(err).Msg("Shutting down")
+			return
+		}
+
 		log.Info().Msg("Fetching users from Formal")
-		users, err := formalClient.ListHumanFormalUsers()
+		users, err := formalClient.ListHumanFormalUsers(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				log.Info().Err(err).Msg("Shutting down")
+				return
+			}
 			log.Error().Err(err).Msg("Failed to fetch Formal users")
 		} else {
 			log.Info().Int("count", len(users)).Msg("Fetched users from Formal")
@@ -101,7 +119,7 @@ func main() {
 			if metabaseEnabled {
 				log.Info().Msg("Starting Metabase sync")
 				metabaseIntegrationID := os.Getenv("METABASE_BI_INTEGRATION_ID")
-				err = MetabaseWorkflow(metabaseIntegration, formalClient, users, metabaseIntegrationID, verifyTLS, cfAccessClientID, cfAccessClientSecret)
+				err = MetabaseWorkflow(ctx, metabaseIntegration, formalClient, users, metabaseIntegrationID, verifyTLS, cfAccessClientID, cfAccessClientSecret)
 				if err != nil {
 					log.Error().Err(err).Msg("Metabase sync failed")
 				}
@@ -109,7 +127,7 @@ func main() {
 
 			if omniEnabled {
 				log.Info().Msg("Starting Omni sync")
-				err = OmniWorkflow(omniIntegration, formalClient, users)
+				err = OmniWorkflow(ctx, omniIntegration, formalClient, users)
 				if err != nil {
 					log.Error().Err(err).Msg("Omni sync failed")
 				}
@@ -120,6 +138,13 @@ func main() {
 			break
 		}
 		log.Info().Msgf("Waiting %s before next sync", duration.String())
-		time.Sleep(duration)
+		timer := time.NewTimer(duration)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			log.Info().Err(ctx.Err()).Msg("Shutting down")
+			return
+		case <-timer.C:
+		}
 	}
 }
