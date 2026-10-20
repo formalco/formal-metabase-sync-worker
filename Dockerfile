@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN go mod tidy && \
+RUN export GOPROXY="https://proxy.golang.org|direct" && go mod tidy && \
   go mod download && \
   go mod verify && \
   CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags='-w -s -extldflags "-static"' -o worker .
